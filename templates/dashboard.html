@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard – IdeaScope{% endblock %}
+
+{% block nav %}
+<nav class="navbar" id="main-navbar">
+    <div class="nav-left">
+        <div class="nav-logo">
+            <div class="logo-diamond logo-diamond-sm">
+                <div class="logo-inner"></div>
+            </div>
+            <span class="nav-brand">IdeaScope</span>
+        </div>
+        <span class="nav-badge">IIVP v2</span>
+    </div>
+    <div class="nav-right">
+        <span class="nav-user">👤 {{ request.user.username }}</span>
+        <span class="nav-divider">|</span>
+        <span class="nav-ideas-count">📁 {{ idea_count }} idea{{ idea_count|pluralize }}</span>
+        <a href="{% url 'logout' %}" class="btn btn-outline btn-sm" id="logout-btn">Logout</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Left Panel: Idea Submission -->
+    <section class="panel panel-input animate-slide-up" id="idea-form-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">💡 Submit Your Idea</h2>
+            <p class="panel-subtitle">Enter your project idea for analysis</p>
+        </div>
+
+        <form method="post" action="{% url 'analyze' %}" class="idea-form" id="idea-form">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="idea-title" class="form-label">Idea Title</label>
+                <input type="text" id="idea-title" name="title" placeholder="e.g. AI-powered Healthcare Diagnostic System" required class="form-input" maxlength="200">
+            </div>
+
+            <div class="form-group">
+                <label for="idea-desc" class="form-label">Description(Only in paraagraph format no bullet points)</label>
+                <textarea id="idea-desc" name="description" placeholder="Describe your idea in detail — what it does, who it helps, and how it works..." required class="form-textarea" rows="5"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group form-group-half">
+                    <label for="idea-domain" class="form-label">Domain</label>
+                    <select id="idea-domain" name="domain" class="form-select">
+                        <option value="General">General</option>
+                        <option value="Web Development">Web Development</option>
+                        <option value="Mobile Development">Mobile Development</option>
+                        <option value="AI / Machine Learning">AI / Machine Learning</option>
+                        <option value="Data Science">Data Science</option>
+                        <option value="DevOps / Cloud">DevOps / Cloud</option>
+                        <option value="Cybersecurity">Cybersecurity</option>
+                        <option value="Blockchain">Blockchain</option>
+                        <option value="IoT">IoT</option>
+                        <option value="Game Development">Game Development</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Education">Education</option>
+                        <option value="Finance">Finance</option>
+                    </select>
+                </div>
+
+                <div class="form-group form-group-half">
+                    <label for="idea-complexity" class="form-label">Complexity: <span id="complexity-value" class="complexity-value">5</span>/10</label>
+                    <input type="range" id="idea-complexity" name="complexity" min="1" max="10" value="5" class="form-range">
+                    <div class="range-labels">
+                        <span>Simple</span>
+                        <span>Complex</span>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full btn-analyze" id="analyze-submit-btn">
+                <span class="btn-text">⚡ Analyze Idea</span>
+                <span class="btn-loader" style="display:none;">
+                    <span class="spinner"></span> Analyzing...
+                </span>
+            </button>
+        </form>
+    </section>
+
+    <!-- Right Panel: Idea History -->
+    <section class="panel panel-history animate-slide-up delay-1" id="idea-history-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">📋 Idea History</h2>
+            <p class="panel-subtitle">Your previously analyzed ideas</p>
+        </div>
+
+        <div class="history-list" id="history-list">
+            {% if ideas %}
+                {% for idea in ideas %}
+                <div class="history-card" id="idea-card-{{ idea.id }}">
+                    <div class="history-card-top">
+                        <h3 class="history-title">{{ idea.title }}</h3>
+                        <span class="history-domain">{{ idea.domain }}</span>
+                    </div>
+                    <p class="history-desc">{{ idea.description|truncatechars:100 }}</p>
+                    <div class="history-meta">
+                        <span class="history-date">{{ idea.created_at|date:"M d, Y" }}</span>
+                        <span class="history-complexity">Complexity: {{ idea.complexity }}/10</span>
+                    </div>
+                    {% if idea.analysis %}
+                    <div class="history-scores">
+                        <div class="mini-score" title="Uniqueness">
+                            <span class="mini-score-label">U</span>
+                            <span class="mini-score-value {% if idea.analysis.uniqueness_score >= 70 %}score-high{% elif idea.analysis.uniqueness_score >= 40 %}score-mid{% else %}score-low{% endif %}">{{ idea.analysis.uniqueness_score|floatformat:0 }}</span>
+                        </div>
+                        <div class="mini-score" title="Feasibility">
+                            <span class="mini-score-label">F</span>
+                            <span class="mini-score-value {% if idea.analysis.feasibility_score >= 70 %}score-high{% elif idea.analysis.feasibility_score >= 40 %}score-mid{% else %}score-low{% endif %}">{{ idea.analysis.feasibility_score|floatformat:0 }}</span>
+                        </div>
+                        <div class="mini-score" title="Impact">
+                            <span class="mini-score-label">I</span>
+                            <span class="mini-score-value {% if idea.analysis.impact_score >= 70 %}score-high{% elif idea.analysis.impact_score >= 40 %}score-mid{% else %}score-low{% endif %}">{{ idea.analysis.impact_score|floatformat:0 }}</span>
+                        </div>
+                        <div class="mini-score" title="Innovation">
+                            <span class="mini-score-label">N</span>
+                            <span class="mini-score-value {% if idea.analysis.innovation_score >= 70 %}score-high{% elif idea.analysis.innovation_score >= 40 %}score-mid{% else %}score-low{% endif %}">{{ idea.analysis.innovation_score|floatformat:0 }}</span>
+                        </div>
+                        <span class="competition-badge comp-{{ idea.analysis.competition_level|lower }}">{{ idea.analysis.competition_level }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="history-actions">
+                        <a href="{% url 'result' idea.id %}" class="btn btn-outline btn-sm">View Results</a>
+                        <a href="{% url 'delete_idea' idea.id %}" class="btn btn-danger btn-sm" onclick="return confirm('Delete this idea?')">Delete</a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">🚀</div>
+                    <h3>No ideas yet</h3>
+                    <p>Submit your first idea to get started with analysis!</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay" style="display:none;">
+    <div class="loading-content">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring spinner-ring-2"></div>
+            <div class="spinner-ring spinner-ring-3"></div>
+        </div>
+        <h3 class="loading-title">Analyzing Your Idea</h3>
+        <p class="loading-text" id="loading-status">Fetching GitHub repositories...</p>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loading-progress-bar"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

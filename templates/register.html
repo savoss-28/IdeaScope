@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register – IdeaScope{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card animate-fade-in">
+        <!-- Logo -->
+        <div class="auth-logo">
+            <div class="logo-diamond">
+                <div class="logo-inner"></div>
+            </div>
+            <h1 class="auth-brand">IdeaScope</h1>
+            <p class="auth-subtitle">Intelligent Idea Analysis Platform</p>
+        </div>
+
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-desc">Join IdeaScope to start analyzing ideas</p>
+
+        <form method="post" class="auth-form" id="register-form" autocomplete="off">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="reg-name" class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="reg-name" name="name" placeholder="Choose a username" required class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-email" class="form-label">Email</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">✉</span>
+                    <input type="email" id="reg-email" name="email" placeholder="Enter your email" required class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-pass1" class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="reg-pass1" name="pass1" placeholder="Create a password (min 6 chars)" required class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-pass2" class="form-label">Confirm Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="reg-pass2" name="pass2" placeholder="Repeat your password" required class="form-input">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="register-submit-btn">
+                <span class="btn-text">Create Account</span>
+                <span class="btn-arrow">→</span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="{% url 'login' %}" class="auth-link">Sign in</a></p>
+        </div>
+    </div>
+
+    <!-- Background decoration -->
+    <div class="auth-bg-decor">
+        <div class="bg-orb bg-orb-1"></div>
+        <div class="bg-orb bg-orb-2"></div>
+        <div class="bg-orb bg-orb-3"></div>
+    </div>
+</div>
+{% endblock %}

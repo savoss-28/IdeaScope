@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Results: {{ idea.title }} – IdeaScope{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function showTab(tabId) {
+    document.querySelectorAll(".iivp-tab-pane").forEach(tab => {
+        tab.style.display = "none";
+    });
+    document.querySelectorAll(".iivp-tab-btn").forEach(btn => {
+        btn.classList.remove("active");
+    });
+    document.getElementById(tabId).style.display = "block";
+    event.currentTarget.classList.add("active");
+}
+
+function openAIModal() {
+    document.getElementById('ai-insights-modal').style.display = 'flex';
+}
+
+function closeAIModal() {
+    document.getElementById('ai-insights-modal').style.display = 'none';
+}
+
+function generateAIInsights() {
+    openAIModal();
+    document.getElementById('ai-loading').style.display = 'block';
+    document.getElementById('ai-results').style.display = 'none';
+    
+    // Fallback token, usually Django's {% csrf_token %} is in forms, here we use template tag
+    const csrftoken = '{{ csrf_token }}';
+    
+    const payload = {
+        title: "{{ idea.title|escapejs }}",
+        description: "{{ idea.description|escapejs }}",
+        domain: "{{ idea.domain|escapejs }}",
+        scores: {
+            uniqueness: {{ analysis.uniqueness_score|floatformat:0 }},
+            feasibility: {{ analysis.feasibility_score|floatformat:0 }},
+            impact: {{ analysis.impact_score|floatformat:0 }},
+            innovation: {{ analysis.innovation_score|floatformat:0 }}
+        }
+    };
+    
+    fetch("{% url 'generate_insights' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-results').style.display = 'block';
+        
+        if(data.error) {
+            document.getElementById('ai-summary').innerText = "Error: " + data.error;
+            return;
+        }
+        
+        document.getElementById('ai-summary').innerText = data.explanations.summary;
+        document.getElementById('ai-exp-uniq').innerText = data.explanations.uniqueness;
+        document.getElementById('ai-exp-feas').innerText = data.explanations.feasibility;
+        document.getElementById('ai-exp-imp').innerText = data.explanations.impact;
+        document.getElementById('ai-exp-inno').innerText = data.explanations.innovation;
+        
+        const suggList = document.getElementById('ai-suggestions-list');
+        suggList.innerHTML = "";
+        data.suggestions.forEach(sugg => {
+            const li = document.createElement("li");
+            li.innerHTML = `<strong>${sugg.category}:</strong> ${sugg.text}`;
+            suggList.appendChild(li);
+        });
+    })
+    .catch(error => {
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-results').style.display = 'block';
+        document.getElementById('ai-summary').innerText = "Failed to load insights.";
+    });
+}
+</script>
+<style>
+.ai-modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 1000;
+    display: flex; justify-content: center; align-items: center;
+}
+.ai-modal-content {
+    background: black; width: 80%; max-width: 800px;
+    border-radius: 12px; border: 1px solid var(--border);
+    padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    max-height: 85vh; overflow-y: auto;color: white;
+}
+.ai-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); padding-bottom: 12px;
+    margin-bottom: 20px;
+}
+.ai-modal-header h3 { margin: 0; color: var(--text-main); font-size: 20px; }
+.btn-close-modal { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; }
+.btn-close-modal:hover { color: var(--text-main); }
+.ai-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.ai-card { background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; line-height: 1.5; color: white; }
+.ai-card strong { color: white; display: block; margin-bottom: 5px;}
+.ai-sugg-list { margin: 0; padding-left: 20px; }
+.ai-sugg-list li { margin-bottom: 8px; font-size: 14px; color: var(--text-main); line-height: 1.5; }
+.ai-summary-banner { background: rgba(179, 136, 255, 0.1); border-left: 4px solid var(--accent-purple); padding: 15px; border-radius: 4px; font-size: 15px; color: #fff; }
+.spinner { border: 4px solid rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; border-left-color: var(--accent-purple); animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block nav %}
+<!-- Hide main navbar to give full screen space to the dashboard -->
+<style>
+    #main-navbar { display: none; }
+</style>
+<nav class="navbar" id="result-navbar">
+    <div class="nav-left">
+        <div class="nav-logo">
+            <div class="logo-diamond logo-diamond-sm">
+                <div class="logo-inner"></div>
+            </div>
+            <span class="nav-brand">IdeaScope</span>
+        </div>
+        <span class="nav-badge" style="background: rgba(179, 136, 255, 0.1); color: var(--accent-purple); border-color: rgba(179, 136, 255, 0.2);">IIVP v2 | User: {{ request.user.username }}</span>
+    </div>
+    <div class="nav-right">
+        {% if analysis.similarity > 0.0 %}
+            <span class="nav-api-status" style="color: var(--accent-green); font-size: 13px; font-weight: 600;"><span style="color: var(--accent-green);">●</span> API Connected</span>
+        {% else %}
+            <span class="nav-api-status" style="color: var(--accent-red); font-size: 13px; font-weight: 600;"><span style="color: var(--accent-red);">●</span> API Disconnected / Blocked</span>
+        {% endif %}
+        <span class="nav-divider" style="margin: 0 10px;">|</span>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm" id="back-dashboard-btn" style="border-color: var(--text-dim);">← Exit Analysis</a>
+        <a href="{% url 'logout' %}" class="btn btn-danger btn-sm" style="background: rgba(255,76,76,0.1); border: 1px solid rgba(255,76,76,0.2);">Logout</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="iivp-dashboard-layout animate-fade-in">
+
+    <!-- LEFT COLUMN: IDEA INPUT SUMMARY -->
+    <div class="iivp-sidebar">
+        <div class="iivp-panel-header">
+            <span class="iivp-icon">💡</span> IDEA INPUT
+        </div>
+        <div class="iivp-sidebar-content">
+            <div class="iivp-field">
+                <label>Idea Title</label>
+                <div class="iivp-readonly-input">{{ idea.title }}</div>
+            </div>
+            
+            <div class="iivp-field">
+                <label>Description</label>
+                <div class="iivp-readonly-textarea">{{ idea.description }}</div>
+            </div>
+
+            <div class="iivp-field">
+                <label>Domain</label>
+                <div class="iivp-readonly-select">{{ idea.domain }}</div>
+            </div>
+
+            <div class="iivp-field">
+                <label>Complexity Level</label>
+                <div class="iivp-readonly-select">{{ idea.complexity }}/10</div>
+            </div>
+            
+            <a href="{% url 'compare' %}?id1={{ idea.id }}" class="btn btn-outline btn-sm" style="border-color: var(--accent-purple); color: var(--accent-purple); width: 100%; text-align: center; margin-top: 20px; display: block;">⚖ Compare Idea</a>
+            <button onclick="generateAIInsights()" class="btn btn-sm" style="background: rgba(179, 136, 255, 0.1); border: 1px solid var(--accent-purple); color: var(--accent-purple); width: 100%; text-align: center; margin-top: 10px; display: block; cursor: pointer;">🤖 Generate AI Insights</button>
+            
+            <div class="iivp-panel-header" style="margin-top: 30px; margin-bottom: 10px;">
+                <span class="iivp-icon">🔑</span> KEYWORDS
+            </div>
+            <div class="iivp-keywords-box">
+                {% for kw in weighted_keywords %}
+                <span class="iivp-kw kw-{{ kw.weight }}">{{ kw.word }}</span>
+                {% empty %}
+                <span style="color: var(--text-dim); font-size: 12px;">No keywords available</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- CENTER COLUMN: CORE ANALYSIS -->
+    <div class="iivp-center">
+        <!-- Top Row: Metrics -->
+        <div class="iivp-metrics-row">
+            <!-- Uniqueness -->
+            <div class="iivp-metric-card">
+                <div class="iivp-metric-top">
+                    <span class="iivp-metric-name"><span class="iivp-dot dot-cyan"></span> Uniqueness</span>
+                    <span class="iivp-metric-val val-cyan">{{ analysis.uniqueness_score|floatformat:0 }}</span>
+                </div>
+                <div class="iivp-metric-bar"><div class="iivp-bar-fill fill-cyan" style="width: {{ analysis.uniqueness_score }}%"></div></div>
+                <div class="iivp-metric-reason">{{ score_reasons.uniqueness }}</div>
+            </div>
+            
+            <!-- Feasibility -->
+            <div class="iivp-metric-card">
+                <div class="iivp-metric-top">
+                    <span class="iivp-metric-name"><span class="iivp-dot dot-yellow"></span> Feasibility</span>
+                    <span class="iivp-metric-val val-yellow">{{ analysis.feasibility_score|floatformat:0 }}</span>
+                </div>
+                <div class="iivp-metric-bar"><div class="iivp-bar-fill fill-yellow" style="width: {{ analysis.feasibility_score }}%"></div></div>
+                <div class="iivp-metric-reason">{{ score_reasons.feasibility }}</div>
+            </div>
+            
+            <!-- Impact -->
+            <div class="iivp-metric-card">
+                <div class="iivp-metric-top">
+                    <span class="iivp-metric-name"><span class="iivp-dot dot-blue"></span> Impact</span>
+                    <span class="iivp-metric-val val-blue">{{ analysis.impact_score|floatformat:0 }}</span>
+                </div>
+                <div class="iivp-metric-bar"><div class="iivp-bar-fill fill-blue" style="width: {{ analysis.impact_score }}%"></div></div>
+                <div class="iivp-metric-reason">{{ score_reasons.impact }}</div>
+            </div>
+            
+            <!-- Innovation -->
+            <div class="iivp-metric-card">
+                <div class="iivp-metric-top">
+                    <span class="iivp-metric-name"><span class="iivp-dot dot-purple"></span> Innovation</span>
+                    <span class="iivp-metric-val val-purple">{{ analysis.innovation_score|floatformat:0 }}</span>
+                </div>
+                <div class="iivp-metric-bar"><div class="iivp-bar-fill fill-purple" style="width: {{ analysis.innovation_score }}%"></div></div>
+                <div class="iivp-metric-reason">{{ score_reasons.innovation }}</div>
+            </div>
+        </div>
+
+        <!-- Middle Row: Competition & Graph -->
+        <div class="iivp-graph-section">
+            <div class="iivp-comp-bar">
+                <div class="iivp-comp-badge">
+                    <span class="iivp-icon">🏁</span> COMPETITION LEVEL <span class="comp-dot comp-{{ analysis.competition_level|lower }}">●</span> <span class="comp-text-{{ analysis.competition_level|lower }}">{{ analysis.competition_level }}</span>
+                </div>
+                <div class="iivp-comp-detail">{{ analysis.competition_detail }}</div>
+            </div>
+            
+            <div class="iivp-chart-container">
+                <div class="iivp-panel-header" style="margin-bottom: 20px;">
+                    <span class="iivp-icon">📊</span> SCORE BREAKDOWN
+                </div>
+                <div style="height: 250px; width: 100%;">
+                    <canvas id="scoreBreakdownChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Recommendation Tabs -->
+        <div class="iivp-recs-section">
+            <div class="iivp-tabs">
+                <button class="iivp-tab-btn active" onclick="showTab('tab-improvements')"><span class="iivp-icon">💡</span> Improvements</button>
+                <button class="iivp-tab-btn" onclick="showTab('tab-risks')"><span class="iivp-icon">⚠️</span> Risks</button>
+                <button class="iivp-tab-btn" onclick="showTab('tab-strategies')"><span class="iivp-icon">🎯</span> Strategies</button>
+                <button class="iivp-tab-btn" onclick="showTab('tab-tech')"><span class="iivp-icon">⚙️</span> Tech Stack</button>
+            </div>
+            
+            <div class="iivp-tab-content">
+                <!-- Verdict Banner -->
+                <div class="iivp-verdict-banner">
+                    {{ recommendations.overall_verdict }}
+                </div>
+
+                <!-- Improvements -->
+                <div id="tab-improvements" class="iivp-tab-pane active">
+                    <ul class="iivp-rec-list">
+                        {% for item in recommendations.improvements %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- Risks -->
+                <div id="tab-risks" class="iivp-tab-pane">
+                    <ul class="iivp-rec-list">
+                        {% for item in recommendations.risks %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- Strategies -->
+                <div id="tab-strategies" class="iivp-tab-pane">
+                    <ul class="iivp-rec-list">
+                        {% for item in recommendations.strategies %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- Tech Stack -->
+                <div id="tab-tech" class="iivp-tab-pane">
+                    <div class="iivp-tech-grid">
+                        {% for category, tools in recommendations.tech_stack.items %}
+                        <div class="iivp-tech-card">
+                            <div class="iivp-tech-header">{{ category }}</div>
+                            <div class="iivp-tech-tools">
+                                {% for tool in tools %}
+                                <span class="iivp-tool-chip">{{ tool }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: GITHUB INTELLIGENCE -->
+    <div class="iivp-github-panel">
+        <div class="iivp-panel-header" style="justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+            <div><span class="iivp-icon">🌐</span> GITHUB INTELLIGENCE</div>
+            <span class="iivp-git-count">Showing {{ repos|length }} repos</span>
+        </div>
+        
+        <div class="iivp-git-list" id="github-list">
+            {% if analysis.github_error %}
+            <div style="color: var(--accent-red); padding: 20px; font-size: 13px; text-align: center;">
+                {{ analysis.github_error }}
+            </div>
+            {% endif %}
+
+            {% for repo in repos %}
+            <a href="{{ repo.url }}" target="_blank" class="iivp-git-card" style="text-decoration: none; color: inherit; display: block;">
+                <h4 class="iivp-git-title" style="margin: 0 0 4px 0;">{{ repo.name }}</h4>
+                <p class="iivp-git-desc">{{ repo.description|truncatechars:100 }}</p>
+                <div class="iivp-git-meta">
+                    <span class="iivp-git-lang"><span class="lang-dot"></span> {{ repo.language }}</span>
+                    <span class="iivp-git-stars">⭐ {{ repo.stars }}</span>
+                </div>
+            </a>
+            {% empty %}
+            {% if not analysis.github_error %}
+            <div style="color: var(--text-dim); padding: 40px 20px; text-align: center; font-size: 13px;">
+                No relevant repos found.<br>Try different keywords.
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Data for ChartJS -->
+{{ analysis.uniqueness_score|json_script:"score-uniq" }}
+{{ analysis.feasibility_score|json_script:"score-feas" }}
+{{ analysis.impact_score|json_script:"score-imp" }}
+{{ analysis.innovation_score|json_script:"score-inno" }}
+
+<!-- AI INSIGHTS MODAL -->
+<div id="ai-insights-modal" class="ai-modal-overlay" style="display: none;">
+    <div class="ai-modal-content">
+        <div class="ai-modal-header">
+            <h3>🤖 AI Idea Insights</h3>
+            <button onclick="closeAIModal()" class="btn-close-modal">✖</button>
+        </div>
+        <div id="ai-loading" style="text-align: center; padding: 40px;">
+            <div class="spinner"></div>
+            <p>Generating insights...</p>
+        </div>
+        <div id="ai-results" style="display: none;">
+            <div class="ai-summary-banner" id="ai-summary"></div>
+            
+            <h4 style="margin-top:20px; margin-bottom:10px;">📊 Explanations</h4>
+            <div class="ai-cards-grid">
+                <div class="ai-card"><strong>Uniqueness</strong> <span id="ai-exp-uniq"></span></div>
+                <div class="ai-card"><strong>Feasibility</strong> <span id="ai-exp-feas"></span></div>
+                <div class="ai-card"><strong>Impact</strong> <span id="ai-exp-imp"></span></div>
+                <div class="ai-card"><strong>Innovation</strong> <span id="ai-exp-inno"></span></div>
+            </div>
+            
+            <h4 style="margin-top:20px; margin-bottom:10px;">💡 Improvement Suggestions</h4>
+            <ul id="ai-suggestions-list" class="ai-sugg-list"></ul>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login – IdeaScope{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card animate-fade-in">
+        <!-- Logo -->
+        <div class="auth-logo">
+            <div class="logo-diamond">
+                <div class="logo-inner"></div>
+            </div>
+            <h1 class="auth-brand">IdeaScope</h1>
+            <p class="auth-subtitle">Intelligent Idea Analysis Platform</p>
+        </div>
+
+        <h2 class="auth-title">Welcome Back</h2>
+        <p class="auth-desc">Sign in to analyze your ideas</p>
+
+        <form method="post" class="auth-form" id="login-form" autocomplete="off">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="login-name" class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="login-name" name="name" placeholder="Enter your username" required class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="login-pass" class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="login-pass" name="pass1" placeholder="Enter your password" required class="form-input">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">
+                <span class="btn-text">Sign In</span>
+                <span class="btn-arrow">→</span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{% url 'register' %}" class="auth-link">Create one</a></p>
+        </div>
+    </div>
+
+    <!-- Background decoration -->
+    <div class="auth-bg-decor">
+        <div class="bg-orb bg-orb-1"></div>
+        <div class="bg-orb bg-orb-2"></div>
+        <div class="bg-orb bg-orb-3"></div>
+    </div>
+</div>
+{% endblock %}

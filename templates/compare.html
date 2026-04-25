@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Compare Ideas – IdeaScope{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="compare-container animate-fade-in" style="min-height: calc(100vh - 100px); display: flex; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h2><span class="iivp-icon">⚖</span> Compare Ideas</h2>
+            <p style="color: var(--text-dim); font-size: 14px; margin-top: 5px;">Select two past ideas to analyze them side-by-side.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline">← Back to Dashboard</a>
+    </div>
+
+    <!-- Selection Form -->
+    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+        <form method="POST" action="{% url 'compare' %}" style="display: flex; gap: 20px; align-items: flex-end;">
+            {% csrf_token %}
+            <div class="form-group" style="flex: 1; margin: 0;">
+                <label>Idea 1</label>
+                <select name="idea1" class="form-select" required>
+                    <option value="">-- Select First Idea --</option>
+                    {% for i in ideas %}
+                    <option value="{{ i.id }}" {% if request.POST.idea1 == i.id|stringformat:"s" %}selected{% endif %}>{{ i.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <span style="color: var(--text-dim); padding-bottom: 12px; font-weight: bold;">VS</span>
+            
+            <div class="form-group" style="flex: 1; margin: 0;">
+                <label>Idea 2</label>
+                <select name="idea2" class="form-select" required>
+                    <option value="">-- Select Second Idea --</option>
+                    {% for i in ideas %}
+                    <option value="{{ i.id }}" {% if request.POST.idea2 == i.id|stringformat:"s" %}selected{% endif %}>{{ i.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="height: 44px; padding: 0 30px;">Compare</button>
+        </form>
+    </div>
+
+    {% if idea1 and idea2 %}
+    
+    {% if better_idea != "Tie" %}
+    <div style="margin-top: 40px; text-align: center; padding: 20px; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: var(--radius-lg);">
+        <h3 style="color: var(--accent-cyan); margin-bottom: 5px;">🏆 Recommended Choice</h3>
+        <p style="color: var(--text-primary); font-size: 16px;">Based on overall metrics, <strong>{{ better_idea.title }}</strong> has higher algorithmic potential.</p>
+    </div>
+    {% else %}
+    <div style="margin-top: 40px; text-align: center; padding: 20px; background: rgba(255, 204, 0, 0.05); border: 1px solid rgba(255, 204, 0, 0.2); border-radius: var(--radius-lg);">
+        <h3 style="color: var(--accent-yellow); margin-bottom: 5px;">⚖️ Tie</h3>
+        <p style="color: var(--text-primary); font-size: 16px;">Both ideas score equally on overall potential.</p>
+    </div>
+    {% endif %}
+    
+    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-top: 20px;">
+        <div style="height: 250px; width: 100%;">
+            <canvas id="compareChart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('compareChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Uniqueness', 'Feasibility', 'Impact', 'Innovation'],
+                datasets: [
+                    {
+                        label: '{{ idea1.title|escapejs }}',
+                        data: [
+                            {{ idea1.analysis.uniqueness_score }},
+                            {{ idea1.analysis.feasibility_score }},
+                            {{ idea1.analysis.impact_score }},
+                            {{ idea1.analysis.innovation_score }}
+                        ],
+                        backgroundColor: 'rgba(0, 240, 255, 0.5)',
+                        borderColor: '#00f0ff',
+                        borderWidth: 1
+                    },
+                    {
+                        label: '{{ idea2.title|escapejs }}',
+                        data: [
+                            {{ idea2.analysis.uniqueness_score }},
+                            {{ idea2.analysis.feasibility_score }},
+                            {{ idea2.analysis.impact_score }},
+                            {{ idea2.analysis.innovation_score }}
+                        ],
+                        backgroundColor: 'rgba(179, 136, 255, 0.5)',
+                        borderColor: '#b388ff',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100 }
+                }
+            }
+        });
+    });
+    </script>
+
+    <div class="compare-grid">
+        <!-- Idea 1 Column -->
+        <div class="compare-col" style="{% if better_idea == idea1 %}border-color: var(--accent-green); box-shadow: 0 0 20px rgba(0,255,159,0.05);{% endif %}">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <h3 style="color: var(--accent-purple); font-size: 20px; text-wrap: wrap;">{{ idea1.title }}</h3>
+                {% if better_idea == idea1 %}<span class="winner-badge">WINNER</span>{% endif %}
+            </div>
+            
+            <p style="color: var(--text-dim); font-size: 13px; line-height: 1.5; margin-bottom: 30px; min-height: 60px;">
+                {{ idea1.description|truncatechars:180 }}
+            </p>
+
+            <div style="margin-bottom: 30px;">
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Domain</span>
+                    <span class="compare-stat-val">{{ idea1.domain }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Overall Score</span>
+                    <span class="compare-stat-val" style="color: var(--accent-cyan); font-size: 18px;">{{ idea1.overall }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Uniqueness</span>
+                    <span class="compare-stat-val">{{ idea1.analysis.uniqueness_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Feasibility</span>
+                    <span class="compare-stat-val">{{ idea1.analysis.feasibility_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Impact</span>
+                    <span class="compare-stat-val">{{ idea1.analysis.impact_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Innovation</span>
+                    <span class="compare-stat-val">{{ idea1.analysis.innovation_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Similarity to Market</span>
+                    <span class="compare-stat-val" style="color: {% if idea1.analysis.similarity > 0.4 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
+                        {{ idea1.analysis.similarity|default:0|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Competition Level</span>
+                    <span class="compare-stat-val" style="color: var(--accent-yellow);">{{ idea1.analysis.competition_level }}</span>
+                </div>
+            </div>
+            
+            <a href="{% url 'result' idea1.id %}" class="btn btn-outline" style="width: 100%; text-align: center;">View Full Analysis</a>
+        </div>
+
+        <!-- Idea 2 Column -->
+        <div class="compare-col" style="{% if better_idea == idea2 %}border-color: var(--accent-green); box-shadow: 0 0 20px rgba(0,255,159,0.05);{% endif %}">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <h3 style="color: var(--accent-purple); font-size: 20px; text-wrap: wrap;">{{ idea2.title }}</h3>
+                {% if better_idea == idea2 %}<span class="winner-badge">WINNER</span>{% endif %}
+            </div>
+            
+            <p style="color: var(--text-dim); font-size: 13px; line-height: 1.5; margin-bottom: 30px; min-height: 60px;">
+                {{ idea2.description|truncatechars:180 }}
+            </p>
+
+            <div style="margin-bottom: 30px;">
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Domain</span>
+                    <span class="compare-stat-val">{{ idea2.domain }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Overall Score</span>
+                    <span class="compare-stat-val" style="color: var(--accent-cyan); font-size: 18px;">{{ idea2.overall }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Uniqueness</span>
+                    <span class="compare-stat-val">{{ idea2.analysis.uniqueness_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Feasibility</span>
+                    <span class="compare-stat-val">{{ idea2.analysis.feasibility_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Impact</span>
+                    <span class="compare-stat-val">{{ idea2.analysis.impact_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Innovation</span>
+                    <span class="compare-stat-val">{{ idea2.analysis.innovation_score }}</span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Similarity to Market</span>
+                    <span class="compare-stat-val" style="color: {% if idea2.analysis.similarity > 0.4 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
+                        {{ idea2.analysis.similarity|default:0|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="compare-stat-row">
+                    <span class="compare-stat-label">Competition Level</span>
+                    <span class="compare-stat-val" style="color: var(--accent-yellow);">{{ idea2.analysis.competition_level }}</span>
+                </div>
+            </div>
+            
+            <a href="{% url 'result' idea2.id %}" class="btn btn-outline" style="width: 100%; text-align: center;">View Full Analysis</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
