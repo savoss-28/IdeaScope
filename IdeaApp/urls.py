@@ -11,4 +11,5 @@ urlpatterns = [
     path('compare/', views.compare_ideas, name='compare'),
     path('delete/<int:idea_id>/', views.delete_idea, name='delete_idea'),
     path('generate-insights/', views.generate_insights_api, name='generate_insights'),
+    path('delete-account/', views.delete_account_view, name='delete_account'),
 ]
