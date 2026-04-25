@@ -96,6 +96,29 @@ def logout_view(request):
     return redirect('login')
 
 
+def delete_account_view(request):
+    """Handle user account deletion."""
+    if request.method == "POST":
+        name = request.POST.get('name', '').strip()
+        password = request.POST.get('pass1', '')
+
+        if not name or not password:
+            messages.error(request, "Please enter both username and password to delete your account.")
+            return redirect('delete_account')
+
+        user = authenticate(username=name, password=password)
+
+        if user is not None:
+            user.delete()
+            messages.success(request, "Your account has been permanently deleted.")
+            return redirect('login')
+        else:
+            messages.error(request, "Invalid username or password.")
+            return redirect('delete_account')
+
+    return render(request, 'delete_account.html')
+
+
 # ── Dashboard View ───────────────────────────────────────────────────────────
 
 @login_required
