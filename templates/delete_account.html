@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delete Account – IdeaScope{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card animate-fade-in" style="border-top: 4px solid var(--accent-red);">
+        <!-- Logo -->
+        <div class="auth-logo">
+            <div class="logo-diamond" style="background: rgba(255, 76, 76, 0.1); border-color: rgba(255, 76, 76, 0.5);">
+                <div class="logo-inner" style="background: var(--accent-red);"></div>
+            </div>
+            <h1 class="auth-brand">IdeaScope</h1>
+            <p class="auth-subtitle">Delete Your Account</p>
+        </div>
+
+        <h2 class="auth-title" style="color: var(--accent-red);">Warning</h2>
+        <p class="auth-desc">This action is permanent and cannot be undone. All your ideas and analysis history will be permanently erased.</p>
+
+        <form method="post" class="auth-form" id="delete-form" autocomplete="off">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="login-name" class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="login-name" name="name" placeholder="Enter your username" required class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="login-pass" class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="login-pass" name="pass1" placeholder="Enter your password" required class="form-input">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-full" id="delete-submit-btn" style="background: rgba(255, 76, 76, 0.1); border: 1px solid rgba(255, 76, 76, 0.3); color: var(--accent-red); font-weight: 600;">
+                <span class="btn-text">Delete My Account Permanently</span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Changed your mind? <a href="{% url 'login' %}" class="auth-link">Return to Login</a></p>
+        </div>
+    </div>
+
+    <!-- Background decoration -->
+    <div class="auth-bg-decor">
+        <div class="bg-orb bg-orb-1" style="background: radial-gradient(circle, rgba(255,76,76,0.15) 0%, rgba(255,76,76,0) 70%);"></div>
+        <div class="bg-orb bg-orb-2"></div>
+        <div class="bg-orb bg-orb-3"></div>
+    </div>
+</div>
+{% endblock %}
