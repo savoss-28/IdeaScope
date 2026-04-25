@@ -344,43 +344,54 @@ def calculate_uniqueness(similarity, repo_count, title, description):
     text = (title + " " + description).lower()
     word_count = len(text.split())
     
-    score = 65.0
+    score = 70.0  # Lowered base slightly for strictness
     
-    similarity_penalty = min(similarity * 50.0, 40.0)
-    repo_penalty = min(repo_count * 3.0, 25.0)
+    # Slightly harsher continuous penalties
+    similarity_penalty = min(similarity * 40.0, 35.0)
+    repo_penalty = min(repo_count * 2.0, 25.0)
     
     score -= similarity_penalty
     score -= repo_penalty
     
-
-    GENERIC_TERMS = [
-        "todo", "to-do", "calculator", "blog", "portfolio", "ecommerce", "weather app", "quiz app",
-        "management system", "library management", "attendance system", "inventory system",
-        "tic tac toe", "snake game", "clone", "twitter clone", "netflix clone", "whatsapp clone",
-        "chat app", "messaging app", "music player", "video player", "to-do list", "notes app", "crud"
-    ]
-    if any(term in text for term in GENERIC_TERMS):
-        score -= 40.0  
+    # Tiered generic term detection to prevent false positives on good ideas
+    HEAVY_GENERIC = ["tic tac toe", "snake game", "netflix clone", "twitter clone", "whatsapp clone", "simple calculator", "basic todo", "simple to-do"]
+    if any(term in text for term in HEAVY_GENERIC):
+        score -= 35.0
         
+    MODERATE_GENERIC = ["todo list", "to-do list", "weather app", "quiz app", "music player", "video player", "notes app", "crud app"]
+    if any(term in text for term in MODERATE_GENERIC):
+        score -= 20.0
+        
+    MILD_GENERIC = ["management system", "attendance system", "inventory system", "portfolio", "blog", "chat app", "ecommerce"]
+    # Only penalize mild generic if the idea lacks advanced tech context
+    has_advanced_tech = any(k in text for k in ["ai ", "machine learning", "blockchain", "iot", "quantum", "llm", "neural", "computer vision"])
+    if any(term in text for term in MILD_GENERIC) and not has_advanced_tech:
+        score -= 10.0
+        
+    # Vague / short description penalty
     if word_count < 15:
+        score -= 10.0
+        
+    # AI wrapper penalty
+    if ("chatgpt" in text or "openai api" in text or "llm wrapper" in text) and ("wrapper" in text or "chatbot" in text or "assistant" in text):
         score -= 15.0
         
-    if ("chatgpt" in text or "openai api" in text or "llm wrapper" in text) and ("wrapper" in text or "chatbot" in text or "assistant" in text):
-        score -= 20.0
-
-    is_generic = any(term in text for term in GENERIC_TERMS)
+    # Rarity boosts
+    is_generic = any(term in text for term in HEAVY_GENERIC + MODERATE_GENERIC)
     if similarity < 0.1 and repo_count == 0 and not is_generic:
         score += 20.0
-    elif similarity < 0.2 and repo_count < 5 and not is_generic:
+    elif similarity < 0.2 and repo_count <= 2 and not is_generic:
         score += 10.0
+    elif similarity < 0.25 and repo_count <= 5 and not is_generic:
+        score += 5.0
         
-    uniqueness = max(20, min(100, round(score)))
+    uniqueness = max(20, min(70, round(score)))
     
     if uniqueness <= 30:
         explanation = "Low uniqueness. This is a highly saturated or fundamentally generic project idea."
-    elif uniqueness < 70:
+    elif uniqueness <= 50:
         explanation = "Moderate uniqueness. Similar existing solutions were found in the market."
-    elif uniqueness < 85:
+    elif uniqueness <= 65:
         explanation = "Good uniqueness with a balanced market presence and room for differentiation."
     else:
         explanation = "Exceptional uniqueness. A highly differentiated concept with almost no direct open-source competitors."
@@ -411,34 +422,40 @@ def calculate_feasibility(complexity, title, description):
     """Returns (score, explanation) tuple."""
     text = (title + " " + description).lower()
     
-    score = 90.0
-
-    score -= (complexity * 4.5)
+    score = 85.0
+    
+    # Primary complexity penalty
+    score -= (complexity * 4.0)
     
     tech_penalty = 0.0
     
+    # Tier 1: Extreme Complexity
     if any(k in text for k in ["quantum computing", "agi", "brain computer interface", "custom os", "kernel module", "custom compiler"]):
-        tech_penalty += 20.0
+        tech_penalty += 15.0
         
+    # Tier 2: Advanced Web3 & Crypto
     elif any(k in text for k in ["zk-rollups", "zero knowledge proofs", "custom blockchain", "layer 1", "defi protocol"]):
-        tech_penalty += 15.0
-    elif any(k in text for k in ["blockchain", "crypto", "smart contract", "dapp", "web3"]):
-        tech_penalty += 8.0
-        
-    if any(k in text for k in ["train foundation model", "custom llm", "distributed training"]):
-        tech_penalty += 15.0
-    elif any(k in text for k in ["deep learning", "neural network", "reinforcement learning", "generative adversarial"]):
         tech_penalty += 10.0
-    elif any(k in text for k in ["ai", "machine learning", "ml", "computer vision", "object detection", "nlp"]):
-        tech_penalty += 5.0
+    elif any(k in text for k in ["blockchain", "crypto", "smart contract", "dapp", "web3"]):
+        tech_penalty += 6.0
         
-    if any(k in text for k in ["kubernetes cluster", "microservices architecture", "distributed system", "high availability"]):
-        tech_penalty += 8.0
-    elif any(k in text for k in ["real-time", "websocket", "streaming", "webrtc"]):
+    # Tier 3: Advanced AI & ML
+    if any(k in text for k in ["train foundation model", "custom llm", "distributed training"]):
+        tech_penalty += 10.0
+    elif any(k in text for k in ["deep learning", "neural network", "reinforcement learning", "generative adversarial"]):
+        tech_penalty += 7.0
+    elif any(k in text for k in ["ai", "machine learning", "ml", "computer vision", "object detection", "nlp"]):
         tech_penalty += 4.0
         
+    # Tier 4: Distributed & Real-time Systems
+    if any(k in text for k in ["kubernetes cluster", "microservices architecture", "distributed system", "high availability"]):
+        tech_penalty += 6.0
+    elif any(k in text for k in ["real-time", "websocket", "streaming", "webrtc"]):
+        tech_penalty += 3.0
+        
+    # Boost for explicitly simple architectures and generic projects
     if any(k in text for k in ["static site", "html css", "simple script", "no-code", "low-code", "basic crud", "todo", "to-do", "calculator"]):
-        score += 20.0
+        score += 15.0
         
     score -= tech_penalty
         
@@ -463,35 +480,41 @@ def calculate_impact(domain, title, description):
     
     score = 50.0
     
+    # Expanded Domain Boost
     high_impact_domains = ["healthcare", "education", "sustainability", "climate", "agriculture", "energy", "mental health", "cybersecurity", "disaster response", "accessibility", "poverty", "fintech"]
     if domain.lower() in high_impact_domains:
         score += 15.0
         
+    # Niche High-Value keywords
     if any(k in text for k in ["open source", "social good", "community driven", "non-profit", "public sector", "democratize", "underprivileged", "rural"]):
         score += 10.0
         
+    # Productivity / B2B keywords
     if any(k in text for k in ["enterprise", "b2b", "workflow automation", "productivity", "efficiency", "supply chain"]):
-        score += 5.0
+        score += 8.0
         
+    # Mild cap for generic apps trying to sound impactful
     GENERIC_TERMS = [
-        "todo", "to-do", "calculator", "blog", "portfolio", "ecommerce", "weather app", "quiz app",
-        "clone", "chat app", "messaging app", "music player", "notes app", "crud"
+        "todo list", "to-do list", "calculator", "weather app", "quiz app",
+        "clone", "music player", "notes app"
     ]
     if any(term in text for term in GENERIC_TERMS):
-        score -= 25.0
-        
-    if any(k in text for k in ["entertainment", "gaming", "meme", "joke", "prank", "casual game", "fun", "hobby"]):
         score -= 15.0
         
-    if word_count < 15:
+    # Entertainment / Low Systemic Impact penalty
+    if any(k in text for k in ["entertainment", "gaming", "meme", "joke", "prank", "casual game", "fun", "hobby"]):
         score -= 10.0
+        
+    # Vague / short description penalty
+    if word_count < 15:
+        score -= 5.0
     
     keyword_weights = 0.0
     for word, value in IMPACT_KEYWORDS.items():
         if word in text:
             keyword_weights += value
             
-    score += min(keyword_weights * 0.4, 20.0)
+    score += min(keyword_weights * 0.4, 25.0)
         
     impact = max(20, min(100, round(score)))
     
@@ -511,51 +534,59 @@ def calculate_innovation(title, description):
     text = (title + " " + description).lower()
     word_count = len(text.split())
     
-    score = 40.0
+    score = 45.0  # Slightly higher base
     
     tech_novelty = 0.0
     domains_found = set()
     
+    # Tier 1: Bleeding Edge
     if any(k in text for k in ["quantum computing", "neuromorphic", "agi", "brain computer interface"]):
-        tech_novelty += 20.0
+        tech_novelty += 30.0
         domains_found.add("deep_tech")
         
+    # Tier 2: Advanced Modern AI
     if any(k in text for k in ["generative ai", "llm", "foundation model", "autonomous agent", "agentic"]):
         tech_novelty += 20.0
         domains_found.add("gen_ai")
-
+        
+    # Tier 3: Crypto / Web3
     if any(k in text for k in ["blockchain", "crypto", "web3", "smart contract", "zk-rollups", "defi"]):
         tech_novelty += 15.0
         domains_found.add("web3")
         
+    # Tier 4: Standard AI / ML / CV
     if any(k in text for k in ["ai", "machine learning", "ml", "deep learning", "neural"]):
-        tech_novelty += 5.0
+        tech_novelty += 12.0
         domains_found.add("ai")
     if any(k in text for k in ["computer vision", "image recognition", "object detection"]):
-        tech_novelty += 8.0
+        tech_novelty += 12.0
         domains_found.add("cv")
     if any(k in text for k in ["nlp", "natural language", "speech recognition"]):
-        tech_novelty += 8.0
+        tech_novelty += 10.0
         domains_found.add("nlp")
- 
+        
+    # Tier 5: Hardware / Edge / AR
     if any(k in text for k in ["iot", "edge computing", "digital twin", "ar", "vr", "spatial computing", "metaverse"]):
-        tech_novelty += 8.0
+        tech_novelty += 12.0
         domains_found.add("hw_ar")
         
-    score += min(tech_novelty, 35.0)
+    score += min(tech_novelty, 40.0)
     
+    # Combination Bonus
     if len(domains_found) >= 3:
         score += 15.0
     elif len(domains_found) == 2:
         score += 8.0
         
+    # Innovation penalty for wrappers and templates
     if any(k in text for k in ["wrapper", "clone", "template", "boilerplate"]):
-        score -= 20.0
-    if any(k in text for k in ["crud", "basic dashboard", "simple api", "todo", "to-do", "calculator", "notes app", "management system"]):
-        score -= 20.0
-        
-    if word_count < 15:
+        score -= 15.0
+    if any(k in text for k in ["crud", "basic dashboard", "simple api", "todo list", "to-do list", "calculator", "notes app"]):
         score -= 10.0
+        
+    # Vague / short description penalty
+    if word_count < 15:
+        score -= 5.0
         
     innovation = max(20, min(100, round(score)))
     
